@@ -2,7 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 :root{
     --bs-primary:#FF8300;
-    --bs-secondary:#000000;
+    --bs-secondary:black;
 }
 body{
     background-color: var(--bs-secondary);

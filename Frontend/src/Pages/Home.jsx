@@ -1,80 +1,81 @@
-import React from 'react'
+import { useNavigate } from 'react-router-dom';
 import { Button, Col, Form, Row } from 'react-bootstrap';
 import Container from 'react-bootstrap/Container';
-import Nav from 'react-bootstrap/Nav';
-import Navbar from 'react-bootstrap/Navbar';
-import NavDropdown from 'react-bootstrap/NavDropdown';
-import hero from '../assets/hero1.png'
-import about from '../assets/about.jpg'
+import hero from '../assets/hero1.png';
+import about from '../assets/about.jpg';
 import Card from 'react-bootstrap/Card';
-import c from '../assets/c.png'
-import cpp from '../assets/c++.png'
-import python from '../assets/python.png'
-import java from '../assets/java.png'
-import css from '../assets/css.png'
+import c from '../assets/c.png';
+import cpp from '../assets/c++.png';
+import python from '../assets/python.png';
+import java from '../assets/java.png';
+import css from '../assets/css.png';
 import Carousel from 'react-bootstrap/Carousel';
-import html from '../assets/html.png'
-import user1 from '../assets/user1.jpg'
-import user2 from '../assets/user2.jpg'
-import user3 from '../assets/user3.jpg'
-import user4 from '../assets/user4.jpg'
-import { useNavigate } from 'react-router-dom';
+import html from '../assets/html.png';
+import user1 from '../assets/user1.jpg';
+import user2 from '../assets/user2.jpg';
+import user3 from '../assets/user3.jpg';
+import user4 from '../assets/user4.jpg';
+import InteractiveCodeDemo from '../components/InteractiveCodeDemo';
+
 const Home = () => {
-    const navigate = useNavigate()
-    const feature = [{ id: 101, icon: <i class="uil uil-robot"></i>, title: "AI Mentor", description: "Get instant AI-powered guidance to understand programming concepts " },
-    { id: 102, icon: <i class="uil uil-desktop"></i>, title: "Online Compiler", description: "Write, run, and test your code directly in the browser without installing any software." },
-    { id: 103, icon: <i class="uil uil-book-open"></i>, title: "Programming Coures", description: "Learn programming courses designed for beginners and advanced learners." },
-    { id: 104, icon: <i class="uil uil-bug"></i>, title: "AI Error Fixes", description: "Receive clear explanations and smart solutions for coding errors in real time." },
-    { id: 105, icon: <i class="uil uil-trophy"></i>, title: "Coding Challenges", description: "Improve your problem-solving skills with interactive coding exercises and challenges." },
-    { id: 106, icon: <i class="uil uil-chart-line"></i>, title: "Progress Tracking", description: "Track your learning progress, quiz scores, and achievements in one place." }
-    ]
+    const navigate = useNavigate();
+    const feature = [{ id: 101, icon: <i className="uil uil-robot"></i>, title: "AI Mentor", description: "Get instant AI-powered guidance to understand programming concepts " },
+    { id: 102, icon: <i className="uil uil-desktop"></i>, title: "Online Compiler", description: "Write, run, and test your code directly in the browser without installing any software." },
+    { id: 103, icon: <i className="uil uil-book-open"></i>, title: "Programming Courses", description: "Learn programming courses designed for beginners and advanced learners." },
+    { id: 104, icon: <i className="uil uil-bug"></i>, title: "AI Error Fixes", description: "Receive clear explanations and smart solutions for coding errors in real time." },
+    { id: 105, icon: <i className="uil uil-trophy"></i>, title: "Coding Challenges", description: "Improve your problem-solving skills with interactive coding exercises and challenges." },
+    { id: 106, icon: <i className="uil uil-chart-line"></i>, title: "Progress Tracking", description: "Track your learning progress, quiz scores, and achievements in one place." }
+    ];
     const course = [{ id: 201, title: "C", description: "Understand programming fundamentals with the C language.", images: c },
     { id: 202, title: "C++", description: "Learn object-oriented programming and problem-solving with C++", images: cpp },
-    { id: 201, title: "Java", description: "Build secure, object-oriented, and enterprise-level applications", images: java },
-    { id: 201, title: "Python", description: "Master Python for web development, automation, and AI", images: python },
-    { id: 201, title: "HTML", description: "Learn the fundamentals of web page structure using HTML5", images: html },
-    { id: 201, title: "CSS", description: "Design beautiful and responsive websites with modern CSS", images: css }
-    ]
+    { id: 203, title: "Java", description: "Build secure, object-oriented, and enterprise-level applications", images: java },
+    { id: 204, title: "Python", description: "Master Python for web development, automation, and AI", images: python },
+    { id: 205, title: "HTML", description: "Learn the fundamentals of web page structure using HTML5", images: html },
+    { id: 206, title: "CSS", description: "Design beautiful and responsive websites with modern CSS", images: css }
+    ];
     const testimonal = [{ id: 301, images: user1, name: "Priya", feedback: "The AI Mentor helped me understand JavaScript concepts easily. The explanations were clear, and the coding challenges improved my confidence." },
     { id: 302, images: user2, name: "Dhivya", feedback: "The online compiler and AI error explanations saved me a lot of time. I can practice coding anywhere without installing software" },
     { id: 303, images: user3, name: "Abhi", feedback: "The structured courses and progress tracking kept me motivated throughout my learning journey. I highly recommend this platform" },
     { id: 304, images: user4, name: "Krithi", feedback: "A perfect platform for beginners. The AI guidance made learning programming enjoyable and helped me solve coding problems faster" }
-    ]
+    ];
     return (
         <div>
             <Container fluid>
-                {/* Navigation bar */}
-                <Navbar expand="lg" className='pt-3 navigation'>
-                    <Container>
-                        <Navbar.Brand href="#home" className='text-white'>Code<span className='heading'>Genius</span></Navbar.Brand>
-                        <Navbar.Toggle aria-controls="basic-navbar-nav" />
-                        <Navbar.Collapse id="basic-navbar-nav">
-                            <Nav className="nav-pages">
-                                <Nav.Link href="#home" className='text-white'>Home</Nav.Link>
-                                <Nav.Link href="#features" className='text-white'>Feature</Nav.Link>
-                                <Nav.Link href="#about" className='text-white'>About</Nav.Link>
-                                <Nav.Link href="#course" className='text-white'>Course</Nav.Link>
-                                <Nav.Link href="#testimonials" className='text-white'>testimonial</Nav.Link>
-                                <Nav.Link href="#contact" className='text-white'>Contact</Nav.Link>
-                            </Nav>
-                        </Navbar.Collapse>
-                        <Button className='login-btn' onClick={()=>navigate('/login')}>Login</Button>
-                    </Container>
-                </Navbar>
-                {/* Hero Section */}
+              
+                {/* Hero Section with Interactive AI Code Demo */}
                 <section id='home'>
                     <Container>
-                        <Row>
-                            <Col md="6" className='hero-content'>
-                                <h1>Learn Coding with AI</h1>
-                                <p>Master programming through interactive courses, AI-powered mentorship,
-                                    coding challenges, and real-time error explanations. Start your coding
-                                    journey with confidence.</p>
-                                <Button className='login-btn me-3'>Get Started</Button>
-                                <Button className='login-btn'>Explore me</Button>
+                        <Row className="align-items-center">
+                            <Col lg={6} className='hero-content mb-4 mb-lg-0'>
+                                <div className="hero-badge">
+                                    <span className="badge-sparkle">✨</span> Next-Gen AI Coding Platform
+                                </div>
+                                <h1>Master Coding with <span className="heading">AI Intelligence</span></h1>
+                                <p>
+                                    Experience real-time AI mentorship, instant 1-click bug fixes, intelligent algorithmic
+                                    breakdowns, and interactive cloud compilation. Accelerate from beginner to pro 10x faster.
+                                </p>
+                                <div className="d-flex flex-wrap gap-3">
+                                    <Button className='login-btn' onClick={() => navigate('/login')}>Get Started Free</Button>
+                                    <Button className='login-btn' onClick={() => { const el = document.getElementById('course'); el?.scrollIntoView({ behavior: 'smooth' }); }}>Explore Courses</Button>
+                                </div>
+                                <div className="hero-stats-row">
+                                    <div className="hero-stat-item">
+                                        <h4>50K+</h4>
+                                        <span>Code Analyses</span>
+                                    </div>
+                                    <div className="hero-stat-item">
+                                        <h4>99.4%</h4>
+                                        <span>AI Fix Accuracy</span>
+                                    </div>
+                                    <div className="hero-stat-item">
+                                        <h4>15+</h4>
+                                        <span>Languages</span>
+                                    </div>
+                                </div>
                             </Col>
-                            <Col md="6">
-                                <img src={hero} alt="heroimage" width={400} height={400} style={{ marginLeft: "20%" }} />
+                            <Col lg={6}>
+                                <InteractiveCodeDemo />
                             </Col>
                         </Row>
                     </Container>
@@ -106,7 +107,7 @@ const Home = () => {
                 </section>
                 {/* About Section */}
                 <section id='about'>
-                    <h1 className='text-center heading-h1 mt-5 pt-5'>ABOUT ME</h1>
+                    <h1 className='text-center heading-h1 mt-5 pt-5'>ABOUT CODEGENIUS</h1>
                     <p className='text-center mb-5'>Learn. Code. Build. Powered by AI.</p>
                     <Container className='about'>
                         <Row>
@@ -129,7 +130,7 @@ const Home = () => {
                                     feedback, and personalized AI guidance to help you grow your
                                     programming skills.
                                 </p>
-                                <Button className='login-btn'>Learn more</Button>
+                                <Button className='login-btn' onClick={() => navigate('/course')}>Explore Courses</Button>
                             </Col>
                         </Row>
                     </Container>
@@ -152,7 +153,7 @@ const Home = () => {
                                                 <Card.Text style={{ fontSize: "15px", textAlign: "justify" }}>
                                                     {a.description}
                                                 </Card.Text>
-                                                <Button className='login-btn' style={{ marginLeft: "30%" }}>Enroll Now</Button>
+                                                <Button className='login-btn' onClick={()=>navigate('/course')} style={{ marginLeft: "30%" }}>View Details</Button>
                                             </Card.Body>
                                         </Card>
                                     </div>
