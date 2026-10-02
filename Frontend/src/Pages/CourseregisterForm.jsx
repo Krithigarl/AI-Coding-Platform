@@ -216,7 +216,7 @@ const CourseregisterForm = () => {
           <Form onSubmit={handleSubmit}>
             {/* Full Name */}
             <Form.Group className="mb-3">
-              <Form.Label className="field-label">Full Name</Form.Label>
+              <Form.Label className="field-label">Full Name Name</Form.Label>
               <Form.Control
                 type="text"
                 name="fullname"
