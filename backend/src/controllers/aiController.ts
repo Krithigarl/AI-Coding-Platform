@@ -3,17 +3,25 @@ import { Request, Response } from "express";
 /**
  * Helper to call Google Gemini API with fallback models
  */
+// callGeminiApi => connects to google gemini AI model API.
 async function callGeminiApi(prompt: string, apiKey: string): Promise<string> {
-  const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+  const cleanKey = apiKey.trim().replace(/^['"]|['"]$/g, "");
+  // Try modern models with fallback
+  const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
   let lastError: any = null;
 
   for (const model of models) {
     try {
+      // Sends a request to Google Generative Language API
+      // Uses both x-goog-api-key header and query parameter for maximum compatibility (including new AQ. format keys)
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(cleanKey)}`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "x-goog-api-key": cleanKey
+          },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
@@ -26,6 +34,7 @@ async function callGeminiApi(prompt: string, apiKey: string): Promise<string> {
 
       if (!response.ok) {
         const errText = await response.text();
+        console.warn(`[Gemini API] Model ${model} returned status ${response.status}:`, errText);
         throw new Error(`Gemini API error (${model}): ${response.status} - ${errText}`);
       }
 
@@ -34,7 +43,7 @@ async function callGeminiApi(prompt: string, apiKey: string): Promise<string> {
       if (candidate) {
         return candidate;
       }
-    } catch (err) {
+    } catch (err: any) {
       lastError = err;
       // Try next model if available
     }
@@ -42,7 +51,7 @@ async function callGeminiApi(prompt: string, apiKey: string): Promise<string> {
 
   throw lastError || new Error("Failed to generate content with Gemini models.");
 }
-
+// local code analyzer ( only works for python) without the internet
 /**
  * Local rule-based analyzer as smart fallback if no API key is set yet
  */
@@ -56,11 +65,17 @@ function analyzeCodeLocally(code: string, language: string, error?: string) {
     const closeParens = (line.match(/\)/g) || []).length;
 
     if (openParens > closeParens) {
+      // auto fixes the error by adding closing parenthesis at the end of the line.
       const fixedLine = line + ")".repeat(openParens - closeParens);
       return {
+        errorMeaning: "SyntaxError: '(' was never closed",
+        errorLocation: `Line ${i + 1}`,
+        errorReason: `The function or expression on line ${i + 1} opened with a parenthesis '(' but didn't close it before the line ended.`,
+        suggestedCode: fixedLine.trim(),
+        simpleExplanation: "In Python, every opening parenthesis '(' must have a matching closing parenthesis ')'. Think of them like quotes or bookends—they always come in pairs!",
         explanation: `The error is because you forgot to close the bracket in the \`${line.trim().split("(")[0]}()\` function.`,
         hint: "Check line " + (i + 1) + ". Every opening parenthesis '(' must have a matching closing parenthesis ')'.",
-        suggestedCode: fixedLine.trim(),
+        quickFix: `Add ')' at the end of line ${i + 1}`,
         line: i + 1,
         source: "local-analyzer"
       };
@@ -69,9 +84,14 @@ function analyzeCodeLocally(code: string, language: string, error?: string) {
     // Python missing colon in if/for/def/while
     if (/^\s*(if|for|while|def|class|elif|else)\b/.test(line) && !line.trim().endsWith(":")) {
       return {
+        errorMeaning: "SyntaxError: Expected ':'",
+        errorLocation: `Line ${i + 1}`,
+        errorReason: `Python control flow statements like \`${line.trim().split(" ")[0]}\` must end with a colon (:).`,
+        suggestedCode: `${line.trim()}:`,
+        simpleExplanation: "In Python, colons ':' tell Python that an indented code block is about to begin. Every if, for, while, or def line must end with ':'!",
         explanation: `In Python, compound statements like \`${line.trim().split(" ")[0]}\` must end with a colon (:).`,
         hint: "Add a colon ':' at the end of line " + (i + 1) + ".",
-        suggestedCode: `${line.trim()}:`,
+        quickFix: `Add ':' at the end of line ${i + 1}`,
         line: i + 1,
         source: "local-analyzer"
       };
@@ -79,11 +99,18 @@ function analyzeCodeLocally(code: string, language: string, error?: string) {
   }
 
   return {
+    errorMeaning: error ? "Runtime/Syntax Issue" : "Code Syntax Check",
+    errorLocation: "Code Block",
+    errorReason: error
+      ? `The code produced this error: ${error}`
+      : "Check variable declarations and statements.",
+    suggestedCode: code,
+    simpleExplanation: "Check that all quotes, brackets, and indents match correctly. Run your code to test.",
     explanation: error
       ? `The code produced an error: ${error}. Review your syntax and variables.`
       : "Check variable declarations and function calls to make sure they are properly formatted.",
     hint: "Make sure all brackets, quotes, and indentation match correctly.",
-    suggestedCode: code,
+    quickFix: "Review code syntax",
     source: "local-analyzer"
   };
 }
@@ -128,19 +155,23 @@ ${error || "No runtime error reported yet. Student asked for a hint."}
 
 Instructions:
 Respond with a strict JSON object only, with NO markdown backticks around the JSON.
-The JSON must have this exact shape:
+The JSON must have this exact shape with 5 structured explanation components:
 {
-  "explanation": "Clear, friendly 1-2 sentence explanation of why the error happened (e.g. 'The error is because you forgot to close the bracket in the print() function.')",
-  "hint": "A subtle conceptual hint to help the student learn without just giving away the solution blindly.",
-  "suggestedCode": "The exact corrected line or short code snippet (e.g. 'print(age)')",
+  "errorMeaning": "Short, clear meaning of the error (e.g. 'SyntaxError: Unclosed Parenthesis')",
+  "errorLocation": "Exact line number or location (e.g. 'Line 4')",
+  "errorReason": "Clear reason why this error occurred in this specific code",
+  "suggestedCode": "The exact corrected line or snippet (e.g. 'print(age)')",
+  "simpleExplanation": "A beginner-friendly analogy or simple explanation that a newcomer can easily understand",
+  "explanation": "Summary of the issue",
+  "hint": "Conceptual hint without giving away the full answer",
   "quickFix": "Short action instruction"
 }
 `;
 
     const rawResponse = await callGeminiApi(systemPrompt, apiKey);
 
-    // Parse JSON from Gemini response (strip ```json if present)
-    let parsedData;
+    // Parse JSON from Gemini response (strip \`\`\`json if present)
+    let parsedData: any;
     try {
       const cleanJson = rawResponse
         .replace(/```json/gi, "")
@@ -149,17 +180,25 @@ The JSON must have this exact shape:
       parsedData = JSON.parse(cleanJson);
     } catch {
       parsedData = {
+        errorMeaning: "Syntax / Runtime Issue",
+        errorLocation: "Code Editor",
+        errorReason: rawResponse,
+        suggestedCode: code,
+        simpleExplanation: "Review your syntax and structure carefully.",
         explanation: rawResponse,
-        hint: "Review your syntax on the highlighted line.",
-        suggestedCode: code
+        hint: "Review your syntax on the highlighted line."
       };
     }
 
     return res.json({
       success: true,
-      explanation: parsedData.explanation,
+      errorMeaning: parsedData.errorMeaning || "Syntax Issue",
+      errorLocation: parsedData.errorLocation || "Line 4",
+      errorReason: parsedData.errorReason || parsedData.explanation,
+      suggestedCode: parsedData.suggestedCode || code,
+      simpleExplanation: parsedData.simpleExplanation || parsedData.hint,
+      explanation: parsedData.explanation || parsedData.errorReason,
       hint: parsedData.hint,
-      suggestedCode: parsedData.suggestedCode,
       quickFix: parsedData.quickFix || "Fix syntax error",
       source: "gemini-ai"
     });
@@ -209,8 +248,13 @@ export const runAndAnalyzeCode = async (req: Request, res: Response) => {
           output: "",
           errorLine: i + 1,
           autoHint: {
+            errorMeaning: "SyntaxError: '(' was never closed",
+            errorLocation: `Line ${i + 1}`,
+            errorReason: `The function or expression on line ${i + 1} opened with a parenthesis '(' but didn't close it before the line ended.`,
+            suggestedCode: `${line})`.trim(),
+            simpleExplanation: "In Python, parentheses always come in matching pairs: '('. Every time you open one with '(', you must close it with ')'.",
             explanation: `The error is because you forgot to close the bracket in the \`${trimmed.split("(")[0]}()\` function.`,
-            suggestedCode: `${line})`.trim()
+            hint: `Check line ${i + 1}. Add a closing ')' at the end.`
           }
         });
       }
@@ -336,11 +380,19 @@ export const chatWithMentor = async (req: Request, res: Response) => {
     }
 
     const prompt = `
-You are CodeGenius AI Mentor, a friendly, concise programming instructor.
+You are CodeGenius AI Mentor, an empathetic, expert programming tutor assisting a student.
 Student Question: ${message}
 ${codeContext ? `Student's Current Code:\n\`\`\`${language}\n${codeContext}\n\`\`\`` : ""}
+Language: ${language}
 
-Provide a helpful, direct, and concise explanation with code examples if helpful. Keep answers under 3 paragraphs.
+Please structure your guidance clearly for a beginner using these sections:
+1. 🔍 **What is the problem?** (Identify the exact issue or concept)
+2. ⚠️ **Why does it happen?** (Explain why this error or behavior occurs)
+3. 🛠️ **How to fix it?** (Step-by-step resolution)
+4. 💻 **Correct Example** (Clean, runnable code snippet)
+5. 💡 **Simple Summary** (A key takeaway or memory tip)
+
+Keep the language encouraging and easy to follow.
 `;
 
     const reply = await callGeminiApi(prompt, apiKey);

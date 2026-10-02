@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   FaPlay,
@@ -15,7 +15,9 @@ import {
   FaCode,
   FaSpinner,
   FaMagic,
-  FaPaperPlane
+  FaPaperPlane,
+  FaArrowLeft,
+  FaCheckCircle
 } from "react-icons/fa";
 import pythonImg from "../assets/python.png";
 import "./Practice.css";
@@ -24,15 +26,27 @@ const API_BASE_URL = "http://localhost:3000/api/ai";
 
 const Practice = () => {
   const { id } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  // Initial code matching screenshot
-  const initialCode = `name = "Krithiga"\nage = 22\nprint(name)\nprint(age`;
+  const searchParams = new URLSearchParams(location.search);
+  const topicId = searchParams.get("topic");
+  const topicTitle = searchParams.get("title");
+
+  // Initial starter code
+  const initialCode = `name = "Learner"\nage = 22\nprint(name)\nprint(age`;
 
   const [code, setCode] = useState(initialCode);
-  const [language, setLanguage] = useState("python");
+  const [language, setLanguage] = useState((id || "python").toLowerCase());
   const [activeTab, setActiveTab] = useState("error"); // "output" or "error"
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      setLanguage(id.toLowerCase());
+    }
+  }, [id]);
 
   // Execution & AI states
   const [isRunning, setIsRunning] = useState(false);
@@ -43,13 +57,19 @@ const Practice = () => {
   );
   const [errorCount, setErrorCount] = useState(1);
 
-  // AI Mentor State
+  // AI Mentor State (5-Point Explanation)
   const [mentorData, setMentorData] = useState({
+    errorMeaning: "SyntaxError: '(' was never closed",
+    errorLocation: "Line 4",
+    errorReason: "The print() function opened with '(' on line 4 but did not have a closing bracket ')' before the line ended.",
+    suggestedCode: "print(age)",
+    simpleExplanation: "In Python, every opening parenthesis '(' must have a matching closing parenthesis ')'. Think of them like shoes or quotes—they always travel in pairs!",
     explanation: "The error is because you forgot to close the bracket in the `print()` function.",
     hint: "Every opening parenthesis '(' must have a matching closing parenthesis ')'.",
-    suggestedCode: "print(age)",
     quickFix: "Close the parenthesis on line 4"
   });
+
+  const [isCompleting, setIsCompleting] = useState(false);
 
   // Chat with Mentor state
   const [chatOpen, setChatOpen] = useState(false);
@@ -57,7 +77,7 @@ const Practice = () => {
   const [chatMessages, setChatMessages] = useState([
     {
       sender: "ai",
-      text: "Hi Krithiga! I noticed an unclosed parenthesis on line 4. Click 'Get Hint' or ask me anything to solve it!"
+      text: "Hi! I noticed an unclosed parenthesis on line 4. Click 'Get Hint' or ask me anything to solve it!"
     }
   ]);
   const [isChatSending, setIsChatSending] = useState(false);
@@ -83,12 +103,17 @@ const Practice = () => {
         setActiveTab("error");
         setOutput("");
 
-        // Auto update AI mentor with context
+        // Auto update AI mentor with structured 5-point context
         if (response.data.autoHint) {
+          const ah = response.data.autoHint;
           setMentorData({
-            explanation: response.data.autoHint.explanation,
-            hint: "Check the syntax error in the error tab.",
-            suggestedCode: response.data.autoHint.suggestedCode,
+            errorMeaning: ah.errorMeaning || "Syntax Issue",
+            errorLocation: ah.errorLocation || (response.data.errorLine ? `Line ${response.data.errorLine}` : "Line 4"),
+            errorReason: ah.errorReason || ah.explanation,
+            simpleExplanation: ah.simpleExplanation || "Check syntax and close all brackets.",
+            explanation: ah.explanation,
+            hint: ah.hint || "Review your syntax in the highlighted line.",
+            suggestedCode: ah.suggestedCode || "",
             quickFix: "Fix syntax error"
           });
         }
@@ -98,6 +123,10 @@ const Practice = () => {
         setErrorCount(0);
         setActiveTab("output");
         setMentorData({
+          errorMeaning: "Clean Code",
+          errorLocation: "All Lines",
+          errorReason: "No errors found",
+          simpleExplanation: "Great work! Your code is syntactically correct and ready for the next challenge.",
           explanation: "Great job! Your code executed cleanly with no syntax or runtime errors.",
           hint: "Try experimenting with different data types like floats, booleans, or lists!",
           suggestedCode: "",
@@ -115,11 +144,31 @@ const Practice = () => {
         );
         setErrorCount(1);
         setActiveTab("error");
+        setMentorData({
+          errorMeaning: "SyntaxError: '(' was never closed",
+          errorLocation: "Line 4",
+          errorReason: "You opened a print call with '(' on line 4 without closing it.",
+          suggestedCode: "print(age)",
+          simpleExplanation: "Every opening bracket '(' requires a closing bracket ')'.",
+          explanation: "The error is because you forgot to close the bracket in the `print()` function.",
+          hint: "Close the parenthesis on line 4.",
+          quickFix: "Add ')'"
+        });
       } else {
         setOutput("Krithiga\n22\n\n=== Code Execution Successful ===");
         setErrorDetails("");
         setErrorCount(0);
         setActiveTab("output");
+        setMentorData({
+          errorMeaning: "Clean Code",
+          errorLocation: "All Lines",
+          errorReason: "No errors found",
+          simpleExplanation: "Your code runs properly!",
+          explanation: "Execution successful with 0 errors.",
+          hint: "Continue to next topic!",
+          suggestedCode: "",
+          quickFix: ""
+        });
       }
     } finally {
       setIsRunning(false);
@@ -134,12 +183,16 @@ const Practice = () => {
         code,
         language,
         error: errorDetails,
-        topic: "Variables & Data Types",
+        topic: topicTitle || topicId || "Variables & Data Types",
         task: "Write a program that prints your name and age correctly."
       });
 
       if (response.data.success) {
         setMentorData({
+          errorMeaning: response.data.errorMeaning || "Syntax Issue",
+          errorLocation: response.data.errorLocation || "Line 4",
+          errorReason: response.data.errorReason || response.data.explanation,
+          simpleExplanation: response.data.simpleExplanation || response.data.hint,
           explanation: response.data.explanation,
           hint: response.data.hint,
           suggestedCode: response.data.suggestedCode,
@@ -149,13 +202,48 @@ const Practice = () => {
     } catch (err) {
       console.warn("Failed to reach Gemini hint endpoint, using local fallback", err);
       setMentorData({
+        errorMeaning: "SyntaxError: '(' was never closed",
+        errorLocation: "Line 4",
+        errorReason: "The print() function on line 4 opened with '(' but didn't have a closing ')'.",
+        suggestedCode: "print(age)",
+        simpleExplanation: "In Python, every opening parenthesis '(' must have a matching closing parenthesis ')'.",
         explanation: "The error is because you forgot to close the bracket in the `print()` function.",
         hint: "Every opening bracket '(' requires a closing bracket ')'.",
-        suggestedCode: "print(age)",
         quickFix: "Close the parenthesis on line 4"
       });
     } finally {
       setIsGettingHint(false);
+    }
+  };
+
+  // Mark Topic Complete in MongoDB & Return to Learning
+  const handleCompletePractice = async () => {
+    setIsCompleting(true);
+    try {
+      const stored = localStorage.getItem("user");
+      let uId = null;
+      let uEmail = null;
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          uId = parsed.id || parsed._id;
+          uEmail = parsed.email;
+        } catch {}
+      }
+
+      await axios.post("http://localhost:3000/api/courses/progress/complete-topic", {
+        courseSlug: language,
+        topicId: topicId || "1.4",
+        userId: uId,
+        email: uEmail,
+        courseName: language.toUpperCase()
+      });
+
+      navigate(`/dashboard/learning/${language}?topic=${encodeURIComponent(topicId || "")}`);
+    } catch (err) {
+      navigate(`/dashboard/learning/${language}`);
+    } finally {
+      setIsCompleting(false);
     }
   };
 
@@ -291,18 +379,28 @@ const Practice = () => {
       </div>
 
       {/* 3. Challenge Section Subheader */}
-      <div className="practice-challenge-header">
+      <div className="practice-challenge-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div className="challenge-title-row">
           <div className="challenge-icon-tag">
             <FaCode />
           </div>
           <div className="challenge-headings">
-            <h2 className="challenge-title">Practice: Variables & Data Types</h2>
+            <h2 className="challenge-title">
+              Practice: {topicTitle ? topicTitle : `${language.toUpperCase()} Coding Challenge`}
+              {topicId && <span className="badge bg-warning text-dark ms-2" style={{ fontSize: "12px" }}>Topic {topicId}</span>}
+            </h2>
             <p className="challenge-subtitle">
-              Write your code below and click Run to see the output or error.
+              Write your code below, run it to test outputs, or ask the AI Mentor for instant hints.
             </p>
           </div>
         </div>
+
+        <button
+          className="btn btn-outline-secondary btn-sm rounded-pill px-3"
+          onClick={() => navigate(`/dashboard/learning/${language}`)}
+        >
+          <FaArrowLeft className="me-1" /> Back to Lesson
+        </button>
       </div>
 
       {/* 4. Main Workbench: Code Editor & Output/Error Console */}
@@ -435,7 +533,30 @@ const Practice = () => {
             ) : (
               <div className="console-output-wrapper">
                 {output ? (
-                  <pre className="output-terminal-text">{output}</pre>
+                  <div>
+                    <pre className="output-terminal-text">{output}</pre>
+                    {errorCount === 0 && (
+                      <div className="mt-3 p-3 rounded" style={{ background: "rgba(46, 213, 115, 0.12)", border: "1px solid rgba(46, 213, 115, 0.35)" }}>
+                        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                          <div>
+                            <div className="text-success fw-bold d-flex align-items-center gap-1 mb-1">
+                              <FaCheckCircle /> Code Execution Successful!
+                            </div>
+                            <small className="text-white-50">
+                              Your code ran without errors. Ready to mark this topic complete?
+                            </small>
+                          </div>
+                          <button
+                            className="btn btn-sm btn-success rounded-pill px-3 fw-semibold"
+                            onClick={handleCompletePractice}
+                            disabled={isCompleting}
+                          >
+                            {isCompleting ? "Saving Progress..." : "Complete Topic & Back to Lesson →"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="console-empty-state">
                     Click <strong>Run</strong> to execute your code and see the standard output here.
@@ -492,45 +613,85 @@ const Practice = () => {
           </div>
         </div>
 
-        {/* AI Mentor Explanation Box */}
+        {/* AI Mentor 5-Point Explanation Box */}
         <div className="mentor-content-body">
-          <p className="mentor-explanation-text">
-            {mentorData.explanation}
-          </p>
+          {errorCount > 0 ? (
+            <div className="mentor-structured-guidance">
+              {/* Point 1: Error Meaning & Point 2: Error Location */}
+              <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                <span className="badge px-3 py-2" style={{ background: "rgba(255, 71, 87, 0.18)", color: "#ff6b81", border: "1px solid rgba(255, 71, 87, 0.4)", fontSize: "0.85rem" }}>
+                  1. Error Meaning: {mentorData.errorMeaning || "Syntax Error"}
+                </span>
+                <span className="badge px-3 py-2" style={{ background: "rgba(255, 131, 0, 0.18)", color: "#FF8300", border: "1px solid rgba(255, 131, 0, 0.4)", fontSize: "0.85rem" }}>
+                  2. Error Location: {mentorData.errorLocation || "Line 4"}
+                </span>
+              </div>
 
-          {mentorData.suggestedCode && (
-            <div className="mentor-try-box">
-              <div className="try-label-row">
-                <span className="try-this-label">Try this:</span>
-                <div className="code-box-actions">
-                  <button
-                    className="code-action-btn apply-btn"
-                    onClick={handleApplyFix}
-                    title="Insert fix into your editor"
-                  >
-                    <FaMagic /> Apply Fix
-                  </button>
-                  <button
-                    className="code-action-btn copy-btn"
-                    onClick={handleCopyCode}
-                    title="Copy code"
-                  >
-                    {copied ? (
-                      <>
-                        <FaCheck className="text-success" /> Copied
-                      </>
-                    ) : (
-                      <>
-                        <FaCopy /> Copy
-                      </>
-                    )}
-                  </button>
+              {/* Point 3: Reason for Error */}
+              <div className="mb-2">
+                <div className="text-white-50 small fw-bold mb-1">
+                  3. Reason for Error:
                 </div>
+                <p className="mentor-explanation-text mb-2 text-white">
+                  {mentorData.errorReason || mentorData.explanation}
+                </p>
               </div>
 
-              <div className="mentor-code-snippet-box">
-                <code>{mentorData.suggestedCode}</code>
+              {/* Point 4: Simple Explanation for Beginners */}
+              <div className="mb-3 p-3 rounded" style={{ background: "rgba(255, 131, 0, 0.08)", borderLeft: "3px solid #FF8300" }}>
+                <div className="text-warning small fw-bold mb-1 d-flex align-items-center gap-1">
+                  <FaLightbulb /> 4. Simple Explanation for Beginners:
+                </div>
+                <p className="mb-0 text-white-50" style={{ fontSize: "0.92rem", lineHeight: 1.5 }}>
+                  {mentorData.simpleExplanation || mentorData.hint || "Keep open and closed brackets balanced whenever you invoke a function."}
+                </p>
               </div>
+
+              {/* Point 5: Corrected Code Example */}
+              {mentorData.suggestedCode && (
+                <div className="mentor-try-box">
+                  <div className="try-label-row">
+                    <span className="try-this-label">5. Corrected Code Example:</span>
+                    <div className="code-box-actions">
+                      <button
+                        className="code-action-btn apply-btn"
+                        onClick={handleApplyFix}
+                        title="Insert fix into your editor"
+                      >
+                        <FaMagic /> Apply Fix
+                      </button>
+                      <button
+                        className="code-action-btn copy-btn"
+                        onClick={handleCopyCode}
+                        title="Copy code"
+                      >
+                        {copied ? (
+                          <>
+                            <FaCheck className="text-success" /> Copied
+                          </>
+                        ) : (
+                          <>
+                            <FaCopy /> Copy
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mentor-code-snippet-box">
+                    <code>{mentorData.suggestedCode}</code>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mentor-clean-code-state py-2">
+              <p className="mentor-explanation-text text-success mb-1">
+                ✓ {mentorData.explanation}
+              </p>
+              <p className="text-white-50 small mb-0">
+                {mentorData.hint}
+              </p>
             </div>
           )}
         </div>

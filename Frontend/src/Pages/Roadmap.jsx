@@ -130,7 +130,12 @@ const Roadmap = () => {
   };
 
   const handleStartLearning = () => {
-    navigate(`/dashboard/learning/${selectedSlug}`);
+    const currentTopic = roadmapData?.topics?.find((t) => t.status === "current") || roadmapData?.topics?.[0];
+    if (currentTopic) {
+      navigate(`/dashboard/learning/${selectedSlug}?topic=${encodeURIComponent(currentTopic.id || currentTopic.title)}`);
+    } else {
+      navigate(`/dashboard/learning/${selectedSlug}`);
+    }
   };
 
   return (
@@ -195,6 +200,16 @@ const Roadmap = () => {
                 <div
                   key={topic.id || index}
                   className={`timeline-step-item ${topic.status}`}
+                  style={{
+                    cursor: isLocked ? "not-allowed" : "pointer",
+                    transition: "transform 0.2s ease, box-shadow 0.2s ease"
+                  }}
+                  onClick={() => {
+                    if (!isLocked) {
+                      navigate(`/dashboard/learning/${selectedSlug}?topic=${encodeURIComponent(topic.id || topic.title)}`);
+                    }
+                  }}
+                  title={isLocked ? "Complete previous topics to unlock" : "Click to learn this topic"}
                 >
                   {/* Vertical Connector line */}
                   {index < roadmapData.topics.length - 1 && (
@@ -210,10 +225,17 @@ const Roadmap = () => {
 
                   {/* Step Content */}
                   <div className="step-content-box">
-                    <div className={`step-status-tag ${topic.status}`}>
-                      {isCompleted && "Completed"}
-                      {isCurrent && "Current Topic"}
-                      {isLocked && "Locked"}
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <div className={`step-status-tag ${topic.status}`}>
+                        {isCompleted && "Completed"}
+                        {isCurrent && "Current Topic"}
+                        {isLocked && "Locked"}
+                      </div>
+                      {!isLocked && (
+                        <small className="text-warning fw-semibold" style={{ fontSize: "0.78rem" }}>
+                          {isCompleted ? "Review Lesson →" : "Learn Lesson →"}
+                        </small>
+                      )}
                     </div>
 
                     <h5 className="step-title-text">{topic.title}</h5>

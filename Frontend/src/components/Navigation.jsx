@@ -9,6 +9,7 @@ const Navigation = () => {
   // Hide public navigation on dashboard, learning, roadmap, auth, and course-register pages
   if (
     location.pathname.startsWith("/dashboard") ||
+    location.pathname.startsWith("/admin") ||
     location.pathname.startsWith("/learning") ||
     location.pathname.startsWith("/roadmap") ||
     location.pathname === "/login" ||
@@ -16,6 +17,9 @@ const Navigation = () => {
   ) {
     return null;
   }
+
+  const token = localStorage.getItem('token');
+  const userRole = localStorage.getItem('userRole');
 
   return (
     <div>
@@ -34,7 +38,35 @@ const Navigation = () => {
                       <Nav.Link href="#contact" className='text-white'>Contact</Nav.Link>
                   </Nav>
               </Navbar.Collapse>
-              <Button className='login-btn' onClick={()=>navigate('/login')}>Login</Button>
+              {token ? (
+                <div className="d-flex align-items-center gap-2">
+                  <Button
+                    className='login-btn'
+                    onClick={() => navigate(userRole === 'admin' ? '/admin/dashboard' : '/dashboard')}
+                  >
+                    Dashboard
+                  </Button>
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    className="text-white border-secondary px-3"
+                    onClick={() => {
+                      localStorage.removeItem('token');
+                      localStorage.removeItem('user');
+                      localStorage.removeItem('userId');
+                      localStorage.removeItem('userRole');
+                      navigate('/login');
+                    }}
+                    title="Log out of your account"
+                  >
+                    Logout
+                  </Button>
+                </div>
+              ) : (
+                <Button className='login-btn' onClick={() => navigate('/login')}>
+                  Login
+                </Button>
+              )}
           </Container>
       </Navbar>
     </div>

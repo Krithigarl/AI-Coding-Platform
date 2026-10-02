@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
 import {
   ProgressBar,
   Button,
@@ -573,7 +574,11 @@ int main() {
 
 const Learning = () => {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
+
+  const searchParams = new URLSearchParams(location.search);
+  const topicParam = searchParams.get("topic");
 
   const courseSlug = (id || "python").toLowerCase();
   const currentCourse =
@@ -592,9 +597,79 @@ const Learning = () => {
   });
   const [activeTopic, setActiveTopic] = useState(allTopicsList[0]);
   const [activeTab, setActiveTab] = useState("learn"); // 'learn' | 'example' | 'task'
+  const [completedTopics, setCompletedTopics] = useState([]);
+  const [isSavingProgress, setIsSavingProgress] = useState(false);
+  const [progressSuccessMsg, setProgressSuccessMsg] = useState("");
+
+  const [userName, setUserName] = useState("Learner");
+
+  useEffect(() => {
+    // Read logged in user name
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === "object") {
+          setUserName(parsed.fullname || parsed.name || "Learner");
+        }
+      }
+    } catch {}
+
+    // Fetch real saved progress from MongoDB
+    const fetchProgress = async () => {
+      try {
+        const stored = localStorage.getItem("user");
+        let uId = null;
+        let uEmail = null;
+        if (stored) {
+          try {
+            const p = JSON.parse(stored);
+            uId = p.id || p._id;
+            uEmail = p.email;
+          } catch {}
+        }
+
+        const params = {};
+        if (uId) params.userId = uId;
+        else if (uEmail) params.email = uEmail;
+
+        const res = await axios.get(
+          `http://localhost:3000/api/courses/progress/${courseSlug}`,
+          { params }
+        );
+
+        if (res.data?.completedTopics && Array.isArray(res.data.completedTopics)) {
+          setCompletedTopics(res.data.completedTopics);
+        }
+      } catch (err) {
+        // fallback
+      }
+    };
+
+    fetchProgress();
+  }, [courseSlug]);
 
   useEffect(() => {
     if (currentCourse?.modules?.length > 0) {
+      // If a topic parameter was passed (e.g. from Roadmap or Practice)
+      if (topicParam) {
+        const decoded = decodeURIComponent(topicParam).trim().toLowerCase();
+        const matched = allTopicsList.find(
+          (t) =>
+            t.id.toLowerCase() === decoded ||
+            t.title.toLowerCase() === decoded ||
+            t.title.toLowerCase().includes(decoded)
+        );
+        if (matched) {
+          setActiveTopic(matched);
+          setExpandedModules((prev) => ({
+            ...prev,
+            [matched.moduleId]: true
+          }));
+          return;
+        }
+      }
+
       setExpandedModules({
         [currentCourse.modules[0].id]: true
       });
@@ -607,7 +682,7 @@ const Learning = () => {
         });
       }
     }
-  }, [courseSlug]);
+  }, [courseSlug, topicParam]);
 
   // Copy feedback
   const [copiedSection, setCopiedSection] = useState("");
@@ -616,7 +691,7 @@ const Learning = () => {
   const [chatMessages, setChatMessages] = useState([
     {
       sender: "ai",
-      text: "Hi Krithiga! 👋 How can I help you with this topic today?"
+      text: `Hi ${userName}! 👋 I'm your AI Mentor for ${currentCourse.name}. Ask me any doubt about this topic!`
     }
   ]);
   const [inputQuestion, setInputQuestion] = useState("");
@@ -637,7 +712,6 @@ const Learning = () => {
   // Select Topic
   const handleSelectTopic = (topic) => {
     setActiveTopic(topic);
-    // Expand parent module
     setExpandedModules((prev) => ({
       ...prev,
       [topic.moduleId]: true
@@ -663,64 +737,142 @@ const Learning = () => {
     }
   };
 
+  // Mark Topic Completed in MongoDB
+  const handleMarkCompleted = async () => {
+    setIsSavingProgress(true);
+    setProgressSuccessMsg("");
+
+    try {
+      const stored = localStorage.getItem("user");
+      let uId = null;
+      let uEmail = null;
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          uId = parsed.id || parsed._id;
+          uEmail = parsed.email;
+        } catch {}
+      }
+
+      const nextId =
+        activeIndex < allTopicsList.length - 1
+          ? allTopicsList[activeIndex + 1].id
+          : null;
+
+      const res = await axios.post(
+        "http://localhost:3000/api/courses/progress/complete-topic",
+        {
+          courseSlug,
+          topicId: activeTopic.id,
+          userId: uId,
+          email: uEmail,
+          totalTopics: allTopicsList.length,
+          nextTopicId: nextId,
+          courseName: currentCourse.name
+        }
+      );
+
+      if (res.data?.completedTopics) {
+        setCompletedTopics(res.data.completedTopics);
+      } else {
+        setCompletedTopics((prev) => Array.from(new Set([...prev, activeTopic.id])));
+      }
+
+      setProgressSuccessMsg(`Topic "${activeTopic.title}" completed & saved to MongoDB!`);
+      setTimeout(() => setProgressSuccessMsg(""), 3500);
+
+      // Auto advance to next topic if available
+      if (nextId) {
+        setTimeout(() => handleNextTopic(), 800);
+      }
+    } catch (err) {
+      setCompletedTopics((prev) => Array.from(new Set([...prev, activeTopic.id])));
+      setProgressSuccessMsg(`Topic marked completed!`);
+      setTimeout(() => setProgressSuccessMsg(""), 3000);
+    } finally {
+      setIsSavingProgress(false);
+    }
+  };
+
   const handleCopy = (text, sectionName) => {
     navigator.clipboard?.writeText(text);
     setCopiedSection(sectionName);
     setTimeout(() => setCopiedSection(""), 2000);
   };
 
-  // AI Prompt handler
+  // AI Prompt handler with real backend call
   const handleQuickPrompt = (promptType) => {
     let questionText = "";
     if (promptType === "explain") {
-      questionText = `Can you explain "${activeTopic.title}" in simple words with a relatable analogy?`;
+      questionText = `Explain "${activeTopic.title}" in beginner-friendly terms with a clear real-life analogy.`;
     } else if (promptType === "hint") {
-      questionText = `Can you give me a hint on how to practice "${activeTopic.title}"?`;
+      questionText = `Give me a helpful hint on how to solve this task: "${activeTopic.task}".`;
     } else if (promptType === "check") {
-      questionText = `How can I verify if my code for "${activeTopic.title}" has any bugs?`;
+      questionText = `Explain common errors beginners make when learning "${activeTopic.title}" and how to prevent them.`;
     } else if (promptType === "optimize") {
-      questionText = `What are the best practices and optimization tips for "${activeTopic.title}"?`;
+      questionText = `What are the best practices for writing clean code in "${activeTopic.title}"?`;
     }
 
     sendAiMessage(questionText);
   };
 
-  const sendAiMessage = (userText) => {
+  const sendAiMessage = async (userText) => {
     if (!userText.trim()) return;
 
     setChatMessages((prev) => [...prev, { sender: "user", text: userText }]);
     setInputQuestion("");
     setAiThinking(true);
 
-    setTimeout(() => {
-      let aiReply = "";
-      if (userText.includes("explain")) {
-        aiReply = `Great question! Think of "${activeTopic.title}" like a recipe step: ${activeTopic.definition} It allows your program to make structured decisions without hardcoding every scenario.`;
-      } else if (userText.includes("hint")) {
-        aiReply = `💡 Pro-Tip for ${activeTopic.title}: Always pay close attention to syntax indentation and make sure your variable names clearly describe what they hold!`;
-      } else if (userText.includes("check") || userText.includes("verify")) {
-        aiReply = `✓ To test your code for ${activeTopic.title}: Test with both normal inputs and edge cases (like empty strings, 0, or negative values). Everything compiles clean!`;
-      } else if (userText.includes("optimize")) {
-        aiReply = `⚡ Performance tip: In modern Python 3, using f-strings and avoiding redundant operations keeps memory footprint under 12MB and execution ultra-fast!`;
-      } else {
-        aiReply = `I understand! Regarding "${activeTopic.title}": The key rule is ${activeTopic.syntaxNote} Keep experimenting with the example code!`;
-      }
+    try {
+      const res = await axios.post("http://localhost:3000/api/ai/chat", {
+        message: userText,
+        codeContext: activeTopic.example,
+        language: courseSlug
+      });
 
-      setChatMessages((prev) => [...prev, { sender: "ai", text: aiReply }]);
-      setAiThinking(false);
-    }, 700);
+      if (res.data?.reply) {
+        setChatMessages((prev) => [...prev, { sender: "ai", text: res.data.reply }]);
+        setAiThinking(false);
+        return;
+      }
+    } catch (apiErr) {
+      // Fallback response if offline
+    }
+
+    let aiReply = "";
+    if (userText.includes("explain")) {
+      aiReply = `Great question! In ${currentCourse.name}, "${activeTopic.title}": ${activeTopic.definition}\n\nKey Rule: ${activeTopic.syntaxNote}`;
+    } else if (userText.includes("hint")) {
+      aiReply = `💡 Pro-Tip for ${activeTopic.title}: ${activeTopic.task}\nSyntax structure to follow: ${activeTopic.syntax}`;
+    } else {
+      aiReply = `I understand! Regarding "${activeTopic.title}": ${activeTopic.definition}\nExperiment with the code example in the sandbox!`;
+    }
+
+    setChatMessages((prev) => [...prev, { sender: "ai", text: aiReply }]);
+    setAiThinking(false);
   };
 
   // Run code simulation
   const handleRunCodeAction = () => {
     setShowConsoleModal(true);
-    setConsoleOutput("Initializing CodeGenius Python Virtual Runtime...\nExecuting script...");
+    setConsoleOutput(`Initializing CodeGenius ${currentCourse.name} Virtual Runtime...\nExecuting script...`);
     setTimeout(() => {
       setConsoleOutput(
-        `> python3 solution.py\n${activeTopic.output}\n\n✓ Process finished with exit code 0 (Execution time: 24ms)`
+        `> python3 solution.py\n${activeTopic.output}\n\n✓ Process finished with exit code 0 (Execution time: 18ms)`
       );
-    }, 500);
+    }, 400);
   };
+
+  // Jump to Practice page with current topic
+  const handleOpenPractice = () => {
+    navigate(`/practice/${courseSlug}?topic=${encodeURIComponent(activeTopic.id)}&title=${encodeURIComponent(activeTopic.title)}`);
+  };
+
+  const courseProgressPercent =
+    allTopicsList.length > 0
+      ? Math.round((completedTopics.length / allTopicsList.length) * 100)
+      : 0;
+  const isCurrentTopicCompleted = completedTopics.includes(activeTopic.id);
 
   if (!activeTopic || !activeTopic.id) {
     return (
@@ -750,8 +902,10 @@ const Learning = () => {
               <h2 className="banner-title mb-1">{currentCourse.name}</h2>
               <p className="banner-sub mb-2">{currentCourse.levelInfo}</p>
               <div className="banner-progress-wrap">
-                <ProgressBar now={42} className="banner-progress-bar" />
-                <span className="banner-progress-label">42% Completed</span>
+                <ProgressBar now={courseProgressPercent} className="banner-progress-bar" />
+                <span className="banner-progress-label">
+                  {courseProgressPercent}% Completed ({completedTopics.length}/{allTopicsList.length} Topics)
+                </span>
               </div>
             </div>
           </div>
@@ -811,17 +965,18 @@ const Learning = () => {
                       <div className="module-topics-list">
                         {mod.topics.map((topic) => {
                           const isSelected = topic.id === activeTopic.id;
+                          const isDone = completedTopics.includes(topic.id);
                           return (
                             <div
                               key={topic.id}
                               className={`topic-row-item ${
                                 isSelected ? "selected" : ""
-                              }`}
+                              } ${isDone ? "is-completed-row" : ""}`}
                               onClick={() => handleSelectTopic(topic)}
                             >
                               <span className="topic-radio-indicator">
-                                {topic.status === "completed" ? (
-                                  <FaCheck className="completed-check-icon" />
+                                {isDone ? (
+                                  <FaCheck className="completed-check-icon text-success" />
                                 ) : isSelected ? (
                                   <span className="active-dot"></span>
                                 ) : (
@@ -847,23 +1002,47 @@ const Learning = () => {
         <section className="lesson-column">
           <div className="lesson-main-card">
             {/* Topic Header & Status */}
-            <div className="lesson-card-header mb-3">
+            <div className="lesson-card-header mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
               <div className="topic-headline-wrap">
                 <span className="active-topic-indicator">●</span>
                 <h3 className="topic-headline-title">
                   {activeTopic.id} {activeTopic.title}
                 </h3>
               </div>
-              {activeTopic.status === "completed" ? (
-                <Badge bg="success" className="topic-completed-badge">
-                  <FaCheck className="me-1" /> Completed
-                </Badge>
-              ) : (
-                <Badge bg="warning" className="topic-completed-badge in-progress-badge">
-                  ● In Progress
-                </Badge>
-              )}
+
+              <div className="d-flex align-items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={isCurrentTopicCompleted ? "success" : "outline-warning"}
+                  className="rounded-pill px-3 py-1"
+                  onClick={handleMarkCompleted}
+                  disabled={isSavingProgress}
+                >
+                  <FaCheckCircle className="me-1" />
+                  {isSavingProgress
+                    ? "Saving..."
+                    : isCurrentTopicCompleted
+                    ? "Completed ✓"
+                    : "Mark as Completed"}
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="outline-info"
+                  className="rounded-pill px-3 py-1"
+                  onClick={handleOpenPractice}
+                  title="Practice this topic in Code Editor"
+                >
+                  <FaCode className="me-1" /> Practice Topic
+                </Button>
+              </div>
             </div>
+
+            {progressSuccessMsg && (
+              <div className="alert alert-success py-2 px-3 small modern-alert d-flex align-items-center gap-2 mb-3">
+                <FaCheckCircle /> {progressSuccessMsg}
+              </div>
+            )}
 
             {/* Mode Tabs (Learn, Example, Task) */}
             <div className="lesson-nav-tabs mb-4">
@@ -1039,16 +1218,16 @@ const Learning = () => {
                   <Button
                     variant="outline-warning"
                     className="mt-3 rounded-pill"
-                    onClick={handleRunCodeAction}
+                    onClick={handleOpenPractice}
                   >
-                    <FaCode className="me-2" /> Solve in Code Editor
+                    <FaCode className="me-2" /> Solve in Code Editor &rarr;
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* Footer Navigation: Previous & Next Topic */}
-            <div className="lesson-footer-nav mt-4 pt-3">
+            {/* Footer Navigation: Previous, Mark Completed & Next Topic */}
+            <div className="lesson-footer-nav mt-4 pt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
               <Button
                 variant="outline-secondary"
                 className="btn-prev-topic"
@@ -1057,6 +1236,30 @@ const Learning = () => {
               >
                 <FaArrowLeft className="me-2" /> Previous
               </Button>
+
+              <div className="d-flex align-items-center gap-2">
+                <Button
+                  variant={isCurrentTopicCompleted ? "outline-success" : "warning"}
+                  className="rounded-pill px-3"
+                  onClick={handleMarkCompleted}
+                  disabled={isSavingProgress}
+                >
+                  <FaCheckCircle className="me-1" />
+                  {isSavingProgress
+                    ? "Saving..."
+                    : isCurrentTopicCompleted
+                    ? "Completed ✓"
+                    : "Mark as Completed"}
+                </Button>
+
+                <Button
+                  variant="outline-info"
+                  className="rounded-pill px-3"
+                  onClick={handleOpenPractice}
+                >
+                  <FaCode className="me-1" /> Practice Coding &rarr;
+                </Button>
+              </div>
 
               <Button
                 className="btn-next-topic"

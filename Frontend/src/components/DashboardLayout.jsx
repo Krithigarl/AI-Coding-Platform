@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
+
   FaHome,
   FaBook,
   FaRoad,
@@ -14,7 +16,10 @@ import {
   FaSignOutAlt,
   FaSearch,
   FaBell,
-  FaQuestionCircle
+  FaQuestionCircle,
+  FaBars,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
 import userAvatar from "../assets/user4.jpg";
 
@@ -22,23 +27,55 @@ const DashboardLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [userName, setUserName] = useState("Krithiga");
+  const [userName, setUserName] = useState("Student");
+  const [userRole, setUserRole] = useState("Student");
+
+  // Sidebar starts with icons only
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   useEffect(() => {
+    // 1. Initial read from localStorage
     try {
       const stored = localStorage.getItem("user");
       if (stored) {
-        setUserName(JSON.parse(stored));
+        const user = JSON.parse(stored);
+        if (user && typeof user === "object") {
+          setUserName(user.fullname || user.name || "Student");
+          setUserRole(user.role === "admin" ? "Admin" : "Student");
+        } else if (typeof user === "string") {
+          setUserName(user);
+        }
       }
-    } catch {
-      // fallback
+    } catch {}
+
+    // 2. Fetch live profile details from backend
+    const fetchUserProfile = async () => {
+      try {
+        const res = await axios.get("http://localhost:3000/api/auth/me");
+        if (res.data && res.data.user) {
+          const u = res.data.user;
+          setUserName(u.fullname || "Student");
+          setUserRole(u.role === "admin" ? "Admin" : "Student");
+          localStorage.setItem("user", JSON.stringify(u));
+          localStorage.setItem("userRole", u.role);
+          localStorage.setItem("userId", JSON.stringify(u.id || u._id));
+        }
+      } catch (err) {
+        // Fallback to local stored info
+      }
+    };
+
+    if (localStorage.getItem("token")) {
+      fetchUserProfile();
     }
   }, []);
+
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("userId");
+    localStorage.removeItem("userRole");
     navigate("/login");
   };
 
@@ -51,107 +88,157 @@ const DashboardLayout = () => {
     { path: "/dashboard/quizzes", label: "Quizzes", icon: <FaClipboardList /> },
     { path: "/dashboard/mentor", label: "AI Mentor", icon: <FaRobot /> },
     { path: "/dashboard/progress", label: "Progress", icon: <FaChartLine /> },
-    { path: "/dashboard/achievements", label: "Achievements", icon: <FaLightbulb /> }
+    { path: "/dashboard/achievements", label: "Achievements", icon: <FaLightbulb /> },
   ];
 
   const isCurrentActive = (path) => {
-    if (path === "/dashboard") {
-      return location.pathname === "/dashboard";
-    }
+    if (path === "/dashboard") return location.pathname === "/dashboard";
     return location.pathname.startsWith(path);
+  };
+
+  const handleItemClick = (path) => {
+    if (isCollapsed) {
+      setIsCollapsed(false);
+    }
+    navigate(path);
   };
 
   return (
     <div className="dashboard-container">
-      {/* Left Sidebar */}
-      <aside className="dashboard-sidebar">
-        {/* Brand Logo */}
+      {/* Sidebar */}
+      <aside className={`dashboard-sidebar ${isCollapsed ? "collapsed" : ""}`}>
+        {/* Logo */}
         <div className="sidebar-logo">
-          <span className="brand-symbol">🟠</span>
-          <span className="brand-name">CodeGenius</span>
+          <div
+            className="sidebar-logo-brand"
+            onClick={() => handleItemClick("/dashboard")}
+          >
+            <span className="brand-symbol">🟠</span>
+            {!isCollapsed && <span className="brand-name">CodeGenius</span>}
+          </div>
+
+          <button
+            className="sidebar-collapse-toggle-btn"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+          >
+            {isCollapsed ? <FaChevronRight /> : <FaChevronLeft />}
+          </button>
         </div>
 
-        {/* Navigation Menu */}
+        {/* Menu */}
         <nav className="sidebar-menu">
-          {navItems.map((item) => {
-            const active = isCurrentActive(item.path);
-            return (
-              <Link
-                key={item.label}
-                to={item.path}
-                className={`sidebar-item ${active ? "active" : ""}`}
-              >
-                <span className="sidebar-item-icon">{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+          {navItems.map((item) => (
+            <button
+              key={item.path}
+              onClick={() => handleItemClick(item.path)}
+              className={`sidebar-item ${
+                isCurrentActive(item.path) ? "active" : ""
+              }`}
+              title={item.label}
+            >
+              <span className="sidebar-item-icon">{item.icon}</span>
+
+              {!isCollapsed && (
+                <span className="sidebar-item-label">{item.label}</span>
+              )}
+            </button>
+          ))}
         </nav>
 
-        {/* Bottom Menu */}
+        {/* Bottom */}
         <div className="sidebar-bottom">
-          <Link
-            to="/dashboard/profile"
-            className={`sidebar-item ${location.pathname === "/dashboard/profile" ? "active" : ""}`}
+          <button
+            onClick={() => handleItemClick("/dashboard/profile")}
+            className={`sidebar-item ${
+              location.pathname === "/dashboard/profile" ? "active" : ""
+            }`}
           >
-            <span className="sidebar-item-icon"><FaCog /></span>
-            <span>Settings</span>
-          </Link>
-          <Link
-            to="/dashboard/help"
-            className={`sidebar-item ${location.pathname === "/dashboard/help" ? "active" : ""}`}
-          >
-            <span className="sidebar-item-icon"><FaQuestionCircle /></span>
-            <span>Help & Support</span>
-          </Link>
+            <span className="sidebar-item-icon">
+              <FaCog />
+            </span>
 
-          {/* User profile badge matching screenshot */}
-          <div className="sidebar-user-card" onClick={() => navigate("/dashboard/profile")}>
-            <img src={userAvatar} alt="Krithiga R." className="sidebar-user-avatar" />
-            <div className="sidebar-user-details">
-              <span className="sidebar-user-name">Krithiga R.</span>
-              <span className="sidebar-user-role">Student</span>
-            </div>
+            {!isCollapsed && (
+              <span className="sidebar-item-label">Settings</span>
+            )}
+          </button>
+
+          <button
+            onClick={() => handleItemClick("/dashboard/help")}
+            className={`sidebar-item ${
+              location.pathname === "/dashboard/help" ? "active" : ""
+            }`}
+          >
+            <span className="sidebar-item-icon">
+              <FaQuestionCircle />
+            </span>
+
+            {!isCollapsed && (
+              <span className="sidebar-item-label">Help & Support</span>
+            )}
+          </button>
+
+          <div
+            className="sidebar-user-card"
+            onClick={() => handleItemClick("/dashboard/profile")}
+          >
+            <img src={userAvatar} alt="user" className="sidebar-user-avatar" />
+
+            {!isCollapsed && (
+              <div className="sidebar-user-details">
+                <span className="sidebar-user-name">{userName}</span>
+                <span className="sidebar-user-role">{userRole}</span>
+              </div>
+            )}
           </div>
 
           <button className="sidebar-item logout-btn-item" onClick={handleLogout}>
-            <span className="sidebar-item-icon"><FaSignOutAlt /></span>
-            <span>Logout</span>
+            <span className="sidebar-item-icon">
+              <FaSignOutAlt />
+            </span>
+
+            {!isCollapsed && (
+              <span className="sidebar-item-label">Logout</span>
+            )}
           </button>
         </div>
       </aside>
 
-      {/* Main Dashboard Panel */}
+      {/* Main */}
       <main className="dashboard-main">
-        {/* Top Navbar */}
         <header className="dashboard-top-navbar">
-          <div className="top-search-wrapper">
-            <FaSearch className="top-search-icon" />
-            <input
-              type="text"
-              className="top-search-input form-control"
-              placeholder="Search for courses, topics, code..."
-            />
+          <div className="top-nav-left">
+            <button
+              className="top-sidebar-toggle-btn"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+            >
+              <FaBars />
+            </button>
+
+            <div className="top-search-wrapper">
+              <FaSearch className="top-search-icon" />
+
+              <input
+                type="text"
+                placeholder="Search for courses..."
+                className="top-search-input"
+              />
+            </div>
           </div>
 
           <div className="top-nav-actions">
-            <button className="top-nav-icon-btn" title="Notifications">
+            <button className="top-nav-icon-btn">
               <FaBell />
             </button>
-            <button className="top-nav-icon-btn" title="Alerts">
-              <FaBell />
-            </button>
+
             <img
               src={userAvatar}
               alt={userName}
               className="top-avatar-img"
-              title={`Logged in as ${userName}`}
               onClick={() => navigate("/dashboard/profile")}
             />
           </div>
         </header>
 
-        {/* Dynamic Nested Content */}
         <div className="dashboard-content-body">
           <Outlet />
         </div>

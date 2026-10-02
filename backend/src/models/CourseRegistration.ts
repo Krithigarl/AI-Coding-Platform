@@ -10,6 +10,10 @@ export interface ICourseRegistration extends mongoose.Document {
   courseSlug: string;
   courseName: string;
   userId?: string;
+  completedTopics?: string[];
+  currentTopic?: string;
+  progress?: number;
+  status?: string;
   createdAt: Date;
 }
 
@@ -55,6 +59,23 @@ const CourseRegistrationSchema = new mongoose.Schema({
   userId: {
     type: String,
     default: null,
+  },
+  completedTopics: {
+    type: [String],
+    default: [],
+  },
+  currentTopic: {
+    type: String,
+    default: "",
+  },
+  progress: {
+    type: Number,
+    default: 0,
+  },
+  status: {
+    type: String,
+    enum: ["in-progress", "completed"],
+    default: "in-progress",
   },
   createdAt: {
     type: Date,

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Col, Container, Row, Card, Spinner, Accordion ,Button} from "react-bootstrap";
 import axios from "axios";
+import learning from '../assets/learning.png'
 
 import pythonImg from "../assets/python.png";
 import cImg from "../assets/c.png";
@@ -95,11 +96,11 @@ const navigate = useNavigate();
   return (
     <div className="page-content">
       <Container fluid>
-        <div className="mb-4">
-          <h2>Courses</h2>
+        <div className="mb-5">
+          <h3 className="text-center"> <img src={learning} alt="" width="40" height="40" className="me-3" />Courses</h3>
         </div>
 
-        <Row className="mt-4 g-4">
+        <Row className="mt-4 g-2">
           <Col md={3} lg={2}>
             <div className="course-sidebar">
               <h4>Courses</h4>
@@ -142,14 +143,14 @@ const navigate = useNavigate();
                         />
                       </Col>
                       <Col md={9}>
-                        <h2>{course.language.toUpperCase()} PROGRAMMING</h2>
-                        <p className="text-muted mb-2">Beginner to Advanced</p>
+                        <h3>{course.language.toUpperCase()} PROGRAMMING</h3>
+                        <p className="mb-2">Beginner to Advanced</p>
                         <p className="mb-0">
                           Learn {course.language} step by step. Open a level,
                           then click a topic to see its description and task.
                         </p>
                         <Button
-                          variant="primary"
+                        className="login-btn  mt-4"
                           onClick={() => {
                             const isLoggedIn = Boolean(localStorage.getItem("token"));
 
@@ -185,7 +186,7 @@ const navigate = useNavigate();
                         >
                           <Accordion.Header>{level.level}</Accordion.Header>
                           <Accordion.Body>
-                            <Accordion className="syllabus-topic-accordion">
+                            <Accordion className="syllabus-topic-accordion bg-black">
                               {level.topics?.map((topic, topicIndex) => (
                                 <Accordion.Item
                                   eventKey={`${levelIndex}-${topicIndex}`}

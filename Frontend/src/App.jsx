@@ -17,6 +17,14 @@ import Roadmap from './Pages/Roadmap';
 import Learning from './Pages/Learning';
 import Practice from './Pages/Practice';
 
+import AdminLayout from './Pages/Admin/AdminLayout';
+import AdminDashboard from './Pages/Admin/AdminDashboard';
+import AdminCourses from './Pages/Admin/AdminCourses';
+import AdminUsers from './Pages/Admin/AdminUsers';
+import AdminRegistrations from './Pages/Admin/AdminRegistrations';
+import AdminAnalytics from './Pages/Admin/AdminAnalytics';
+import AdminSettings from './Pages/Admin/AdminSettings';
+
 const isAuthenticated = () => Boolean(localStorage.getItem('token'));
 
 const ProtectedRoute = ({ children }) => {
@@ -24,6 +32,20 @@ const ProtectedRoute = ({ children }) => {
 
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  return children;
+};
+
+const AdminProtectedRoute = ({ children }) => {
+  const location = useLocation();
+
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  if (localStorage.getItem('userRole') !== 'admin') {
+    return <Navigate to="/dashboard" replace state={{ accessDenied: true }} />;
   }
 
   return children;
@@ -42,6 +64,7 @@ const App = () => {
           <Route path="/course-register/:id" element={<CourseregisterForm />} />
           <Route path="/course-register" element={<CourseregisterForm />} />
 
+          {/* Student Dashboard Routes */}
           <Route
             path="/dashboard"
             element={
@@ -61,6 +84,24 @@ const App = () => {
             <Route path="mentor" element={<Mentor />} />
             <Route path="progress" element={<Progress />} />
             <Route path="profile" element={<Profile />} />
+          </Route>
+
+          {/* Admin Console Routes */}
+          <Route
+            path="/admin"
+            element={
+              <AdminProtectedRoute>
+                <AdminLayout />
+              </AdminProtectedRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="courses" element={<AdminCourses />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="registrations" element={<AdminRegistrations />} />
+            <Route path="analytics" element={<AdminAnalytics />} />
+            <Route path="settings" element={<AdminSettings />} />
           </Route>
 
           <Route path="/practice" element={<Practice />} />

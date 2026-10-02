@@ -57,14 +57,26 @@ const CourseregisterForm = () => {
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
+        // parsed may be an object {fullname, id, email} or a plain string (old shape)
+        const name =
+          typeof parsed === "object"
+            ? parsed?.fullname || parsed?.name || ""
+            : typeof parsed === "string"
+            ? parsed
+            : "";
+        const email =
+          typeof parsed === "object" ? parsed?.email || "" : "";
+
         setFormData((prev) => ({
           ...prev,
-          fullname: prev.fullname || parsed || ""
+          fullname: prev.fullname || name,
+          email: prev.email || email,
         }));
       }
     } catch {
       // ignore
     }
+
 
     // Try fetching course name from backend if available
     if (id) {

@@ -51,13 +51,14 @@ export const getCourseRoadmap = async (req: Request, res: Response) => {
 
     // Check if user is registered for this course
     let isEnrolled = false;
+    let userRegistration: any = null;
     if (userId || email) {
       const regQuery: any = { courseSlug: slug };
       if (userId) regQuery.userId = userId;
       else if (email) regQuery.email = email;
 
-      const reg = await CourseRegistration.findOne(regQuery);
-      if (reg) isEnrolled = true;
+      userRegistration = await CourseRegistration.findOne(regQuery);
+      if (userRegistration) isEnrolled = true;
     }
 
     // Flatten all topics from Beginner, Intermediate, Advanced levels into an ordered roadmap
@@ -83,30 +84,44 @@ export const getCourseRoadmap = async (req: Request, res: Response) => {
       });
     });
 
-    // Assign status progression
-    if (topicsList.length > 0) {
-      topicsList[0].status = "completed";
-      if (topicsList.length > 1) {
-        topicsList[1].status = "current";
+    // Assign status progression based on real database records
+    const userCompleted = new Set(userRegistration?.completedTopics || []);
+    let currentAssigned = false;
+
+    topicsList.forEach((t) => {
+      if (userCompleted.has(t.id) || userCompleted.has(t.title)) {
+        t.status = "completed";
+      } else if (!currentAssigned) {
+        t.status = "current";
+        currentAssigned = true;
+      } else {
+        t.status = "locked";
       }
+    });
+
+    if (!currentAssigned && topicsList.length > 0 && topicsList[0].status !== "completed") {
+      topicsList[0].status = "current";
     }
 
     const completedCount = topicsList.filter((t) => t.status === "completed").length;
-    const progressPercent = topicsList.length > 0 ? Math.round((completedCount / topicsList.length) * 100) : 0;
-    const displayProgress = isEnrolled ? Math.max(progressPercent, 42) : 20;
+    const progressPercent = topicsList.length > 0
+      ? Math.round((completedCount / topicsList.length) * 100)
+      : 0;
 
     const currentTopic = topicsList.find((t) => t.status === "current") || topicsList[0];
     const nextTopic = topicsList.find((t) => t.status === "locked") || topicsList[topicsList.length - 1];
 
     const aiMentorSuggestion = currentTopic && nextTopic
-      ? `Complete "${currentTopic.title}" to unlock ${nextTopic.title}.`
+      ? `Complete "${currentTopic.title}" to unlock "${nextTopic.title}".`
       : `Keep practicing ${course.language} code to master all levels!`;
 
     return res.json({
       language: course.language,
       slug: course.slug,
       isEnrolled,
-      progress: displayProgress,
+      progress: userRegistration?.progress !== undefined ? userRegistration.progress : progressPercent,
+      completedCount,
+      totalTopics: topicsList.length,
       aiMentorSuggestion,
       topics: topicsList
     });
@@ -148,7 +163,10 @@ export const registerForCourse = async (req: Request, res: Response) => {
       learningGoal: learningGoal || "",
       courseSlug: courseSlug || "python",
       courseName: courseName || "Python Programming",
-      userId: userId || null
+      userId: userId || null,
+      completedTopics: [],
+      progress: 0,
+      status: "in-progress"
     });
 
     return res.status(201).json({
@@ -161,6 +179,110 @@ export const registerForCourse = async (req: Request, res: Response) => {
     return res.status(500).json({
       message: "Server Error saving course registration to MongoDB."
     });
+  }
+};
+
+// Update or record topic completion for a course
+export const updateTopicProgress = async (req: Request, res: Response) => {
+  try {
+    const { courseSlug, topicId, userId, email, totalTopics = 10, nextTopicId, courseName } = req.body;
+
+    if (!courseSlug || !topicId) {
+      return res.status(400).json({ message: "courseSlug and topicId are required" });
+    }
+
+    const query: any = { courseSlug: courseSlug.toLowerCase() };
+    if (userId) query.userId = userId;
+    else if (email) query.email = email.toLowerCase();
+    else {
+      return res.status(400).json({ message: "userId or email is required to update progress" });
+    }
+
+    let registration = await CourseRegistration.findOne(query);
+
+    // If student isn't explicitly registered yet, auto-enroll them seamlessly
+    if (!registration) {
+      registration = await CourseRegistration.create({
+        fullname: req.body.fullname || "Student",
+        email: email || "student@example.com",
+        phone: "N/A",
+        education: "Self-Paced Learner",
+        experience: "Beginner",
+        courseSlug: courseSlug.toLowerCase(),
+        courseName: courseName || `${courseSlug.toUpperCase()} Programming`,
+        userId: userId || null,
+        completedTopics: [topicId],
+        currentTopic: nextTopicId || topicId,
+        progress: Math.min(100, Math.round((1 / Math.max(1, totalTopics)) * 100)),
+        status: "in-progress"
+      });
+    } else {
+      // Add topicId uniquely
+      const completed = new Set(registration.completedTopics || []);
+      completed.add(topicId);
+      const completedList = Array.from(completed);
+
+      const calculatedPercent = Math.min(
+        100,
+        Math.round((completedList.length / Math.max(1, totalTopics)) * 100)
+      );
+
+      registration.completedTopics = completedList;
+      registration.progress = calculatedPercent;
+      registration.currentTopic = nextTopicId || topicId;
+      if (calculatedPercent >= 100) {
+        registration.status = "completed";
+      }
+
+      await registration.save();
+    }
+
+    return res.json({
+      success: true,
+      message: `Topic ${topicId} marked as completed!`,
+      progress: registration.progress,
+      completedTopics: registration.completedTopics,
+      currentTopic: registration.currentTopic,
+      status: registration.status
+    });
+  } catch (error) {
+    console.error("Progress update error:", error);
+    return res.status(500).json({ message: "Server error saving progress to MongoDB" });
+  }
+};
+
+// Get learning progress for a course
+export const getCourseProgress = async (req: Request, res: Response) => {
+  try {
+    const { courseSlug } = req.params;
+    const { userId, email } = req.query;
+
+    const query: any = { courseSlug: (courseSlug as string).toLowerCase() };
+    if (userId) query.userId = userId;
+    else if (email) query.email = (email as string).toLowerCase();
+
+    const registration = await CourseRegistration.findOne(query);
+
+    if (!registration) {
+      return res.json({
+        isEnrolled: false,
+        progress: 0,
+        completedTopics: [],
+        currentTopic: "",
+        status: "not-started"
+      });
+    }
+
+    return res.json({
+      isEnrolled: true,
+      progress: registration.progress || 0,
+      completedTopics: registration.completedTopics || [],
+      currentTopic: registration.currentTopic || "",
+      status: registration.status || "in-progress",
+      registration
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error fetching course progress" });
   }
 };
 

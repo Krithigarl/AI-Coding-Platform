@@ -19,6 +19,7 @@ import InteractiveCodeDemo from '../components/InteractiveCodeDemo';
 
 const Home = () => {
     const navigate = useNavigate();
+
     const feature = [{ id: 101, icon: <i className="uil uil-robot"></i>, title: "AI Mentor", description: "Get instant AI-powered guidance to understand programming concepts " },
     { id: 102, icon: <i className="uil uil-desktop"></i>, title: "Online Compiler", description: "Write, run, and test your code directly in the browser without installing any software." },
     { id: 103, icon: <i className="uil uil-book-open"></i>, title: "Programming Courses", description: "Learn programming courses designed for beginners and advanced learners." },
@@ -28,10 +29,10 @@ const Home = () => {
     ];
     const course = [{ id: 201, title: "C", description: "Understand programming fundamentals with the C language.", images: c },
     { id: 202, title: "C++", description: "Learn object-oriented programming and problem-solving with C++", images: cpp },
-    { id: 203, title: "Java", description: "Build secure, object-oriented, and enterprise-level applications", images: java },
-    { id: 204, title: "Python", description: "Master Python for web development, automation, and AI", images: python },
-    { id: 205, title: "HTML", description: "Learn the fundamentals of web page structure using HTML5", images: html },
-    { id: 206, title: "CSS", description: "Design beautiful and responsive websites with modern CSS", images: css }
+    { id: 203, title: "Java", description: "Build secure, object-oriented, and enterprise-level applications with JAVA", images: java },
+    { id: 204, title: "Python", description: "Master Python for web development, automation, and AI with Python", images: python },
+    { id: 205, title: "HTML", description: "Learn the fundamentals and create web page structure using HTML5", images: html },
+    { id: 206, title: "CSS", description: "Design layout , alignment and responsive websites with modern CSS", images: css }
     ];
     const testimonal = [{ id: 301, images: user1, name: "Priya", feedback: "The AI Mentor helped me understand JavaScript concepts easily. The explanations were clear, and the coding challenges improved my confidence." },
     { id: 302, images: user2, name: "Dhivya", feedback: "The online compiler and AI error explanations saved me a lot of time. I can practice coding anywhere without installing software" },
@@ -45,7 +46,7 @@ const Home = () => {
                 {/* Hero Section with Interactive AI Code Demo */}
                 <section id='home'>
                     <Container>
-                        <Row className="align-items-center">
+                        <Row className="align-items-center mt-5 ">
                             <Col lg={6} className='hero-content mb-4 mb-lg-0'>
                                 <div className="hero-badge">
                                     <span className="badge-sparkle">✨</span> Next-Gen AI Coding Platform
@@ -55,9 +56,8 @@ const Home = () => {
                                     Experience real-time AI mentorship, instant 1-click bug fixes, intelligent algorithmic
                                     breakdowns, and interactive cloud compilation. Accelerate from beginner to pro 10x faster.
                                 </p>
-                                <div className="d-flex flex-wrap gap-3">
-                                    <Button className='login-btn' onClick={() => navigate('/login')}>Get Started Free</Button>
-                                    <Button className='login-btn' onClick={() => { const el = document.getElementById('course'); el?.scrollIntoView({ behavior: 'smooth' }); }}>Explore Courses</Button>
+                                <div className="hero-btns">
+                                    <Button className='login-btn w-50' style={{marginLeft:"80px"}} onClick={() => { const el = document.getElementById('course'); el?.scrollIntoView({ behavior: 'smooth' }); }}>Explore Courses</Button>
                                 </div>
                                 <div className="hero-stats-row">
                                     <div className="hero-stat-item">
@@ -130,7 +130,7 @@ const Home = () => {
                                     feedback, and personalized AI guidance to help you grow your
                                     programming skills.
                                 </p>
-                                <Button className='login-btn' onClick={() => navigate('/course')}>Explore Courses</Button>
+                                <Button className='login-btn w-50' style={{ marginLeft: "160px" }} onClick={() => navigate('/course')}>Explore Courses</Button>
                             </Col>
                         </Row>
                     </Container>
@@ -153,7 +153,9 @@ const Home = () => {
                                                 <Card.Text style={{ fontSize: "15px", textAlign: "justify" }}>
                                                     {a.description}
                                                 </Card.Text>
-                                                <Button className='login-btn' onClick={()=>navigate('/course')} style={{ marginLeft: "30%" }}>View Details</Button>
+                                                <Button className='login-btn' style={{ marginLeft: "20%" }} onClick={()=>navigate('/course')}>
+                                                    View Details
+                                                </Button>
                                             </Card.Body>
                                         </Card>
                                     </div>

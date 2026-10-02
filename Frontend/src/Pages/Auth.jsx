@@ -1,13 +1,20 @@
 import { useState } from "react";
 import { Container, Row, Col } from "react-bootstrap";
 import { motion } from "framer-motion";
+import { Navigate } from "react-router-dom";
 import LoginForm from "../components/LoginForm";
 import RegisterForm from "../components/RegisterForm";
 import WelcomePanel from "../components/WelcomePanel";
 
-const Auth=()=> {
-
+const Auth = () => {
     const [isLogin, setIsLogin] = useState(true);
+
+    const token = localStorage.getItem("token");
+    const role = localStorage.getItem("userRole");
+
+    if (token) {
+        return <Navigate to={role === "admin" ? "/admin" : "/dashboard"} replace />;
+    }
 
     return (
         <Container fluid className="auth-page">
@@ -18,9 +25,21 @@ const Auth=()=> {
                             <Col lg={5}>
                                 <WelcomePanel isLogin={isLogin} setIsLogin={setIsLogin} />
                             </Col>
-                            <Col lg={7}>
-                                <motion.div key={isLogin} initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: .5 }}>
-                                    {isLogin ? <LoginForm /> : <RegisterForm />}</motion.div>
+                            <Col lg={7} className="d-flex align-items-center">
+                                <motion.div
+                                    key={isLogin ? "login" : "register"}
+                                    initial={{ opacity: 0, y: 15 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.35 }}
+                                    className="w-100"
+                                >
+                                    {isLogin ? (
+                                        <LoginForm setIsLogin={setIsLogin} />
+                                    ) : (
+                                        <RegisterForm setIsLogin={setIsLogin} />
+                                    )}
+                                </motion.div>
                             </Col>
                         </Row>
                     </div>
